@@ -1,113 +1,181 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useState, useEffect } from "react";
-import { Image, StyleSheet, Text, View, ScrollView } from "react-native";
-// import * as Location from "expo-location";
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+} from "react-native";
+import * as Location from "expo-location";
 
 export default function App() {
-  //METEO API
-  const [meteo, setMeteo] = useState(null);
-  const [prevision, setPrevision] = useState([]);
-
-  const APIKey = "a8fcaa294aa3d1dcd5ae451cd20493ab";
-
-  useEffect(() => {
-    //Recupere meteo du jour
-    fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=Lyon&units=metric&lang=fr&appid=${APIKey}`
-    )
-      .then((response) => response.json())
-      .then((json) => {
-        setMeteo(json);
-      });
-    //Recupère méteo pour les 5 prochains jours
-    fetch(
-      `https://api.openweathermap.org/data/2.5/forecast?q=Lyon&units=metric&lang=fr&appid=${APIKey}`
-    )
-      .then((response) => response.json())
-      .then((json) => {
-        setPrevision(json);
-      });
-  }, []);
   //--------------------LOCALISATION---------------------------//
-  const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   useEffect(() => {
     (async () => {
-      if (Platform.OS === "android" && !Device.isDevice) {
-        setErrorMsg(
-          "Oops, this will not work on Snack in an Android Emulator. Try it on your device!"
-        );
-        return;
-      }
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setErrorMsg("Permission to access location was denied");
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
+      try {
+        let location = await Location.getCurrentPositionAsync({});
+        setLatitude(String(location.coords.latitude));
+        setLongitude(String(location.coords.longitude));
+      } catch (error) {
+        setErrorMsg("Failed to fetch location");
+      }
     })();
   }, []);
 
-  let text = "Waiting..";
-  if (errorMsg) {
-    text = errorMsg;
-  } else if (location) {
-    text = JSON.stringify(location);
+  //-------------------------METEO API-------------------------//
+  const [meteo, setMeteo] = useState(null);
+  const [prevision, setPrevision] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const APIKey = "a8fcaa294aa3d1dcd5ae451cd20493ab";
+
+  useEffect(() => {
+    if (latitude && longitude) {
+      //Recupere meteo du jour
+      setIsLoading(true);
+      try {
+        fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=fr&appid=${APIKey}`
+        )
+          .then((response) => response.json())
+          .then((json) => {
+            if (json.weather && json.main) {
+              setMeteo(json);
+            }
+            setIsLoading(false);
+          });
+        //Recupère méteo pour les 5 prochains jours
+        fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&units=metric&lang=fr&appid=${APIKey}`
+        )
+          .then((response) => response.json())
+          .then((json) => {
+            setPrevision(json.list);
+          });
+      } catch (error) {
+        console.error("Echec fetch :", error);
+        setIsLoading(false);
+      }
+    }
+  }, [latitude, longitude]);
+
+  function getJour(timestamp) {
+    const jours = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+    const date = new Date(timestamp * 1000);
+    //const date = new Date(timestamp);
+    //console.log(date);
+    //console.log(date.getDay());
+    return jours[date.getDay()];
   }
+
   //------------------------CODE-----------------------------//
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Voici la météo actuelle à Lyon</Text>
-      {meteo && meteo.weather && meteo.main && (
-        <>
-          <Text>{meteo.main.temp}</Text>
-          <Text>{meteo.weather[0].description}</Text>
-          <Image
-            source={{
-              uri: `https://openweathermap.org/img/w/${meteo.weather[0].icon}.png`,
-            }}
-            style={styles.icon}
-          />
-        </>
-      )}
-
-      <Text style={styles.text}>
-        Prévisions météo à 15h pour les 5 prochains jours
-      </Text>
-      <Text style={styles.paragraph}>{text}</Text>
-      <ScrollView horizontal>
-        {/* {prevision.map((item) => (
-          <View key={item.dt} style={styles.previsionDay}>
-            <Text style={styles.previsionText}>{getDayOfWeek(item.dt)}</Text>
-            <Text style={styles.previsionText}>{item.main.temp}°C</Text>
-            <Text style={styles.previsionText}>{item.weather[0].description}</Text>
-            <Image
-              source={{
-                uri: `https://openweathermap.org/img/w/${item.weather[0].icon}.png`,
-              }}
-              style={styles.previsionIcon}
-            />
+    <View style={styles.background}>
+      <Image
+        source={{
+          uri: "https://files.smashing.media/articles/ai-technology-transform-design/11-glass-reflection-cgi.gif",
+        }}
+        style={styles.backgroundImage}
+      ></Image>
+      <ScrollView>
+        <View style={styles.container}>
+          <View style={styles.accueil}>
+            {meteo && meteo.weather && meteo.main ? (
+              <>
+                <Text style={styles.text}>
+                  Voici la météo actuelle à {meteo.name}
+                </Text>
+                <Text style={styles.gras}>{meteo.weather[0].description}</Text>
+                <Image
+                  source={{
+                    uri: `https://openweathermap.org/img/w/${meteo.weather[0].icon}.png`,
+                  }}
+                  style={styles.icon}
+                />
+                <Text style={styles.grasTemp}>{meteo.main.temp}</Text>
+              </>
+            ) : (
+              <ActivityIndicator size="large" color="#0000ff" />
+            )}
           </View>
-        ))} */}
-      </ScrollView>
 
-      <StatusBar style="auto" />
+          <Text style={styles.text}>
+            Prévisions météo à 15h pour les 5 prochains jours
+          </Text>
+
+          {errorMsg ? (
+            <Text style={styles.paragraph}>{errorMsg}</Text>
+          ) : isLoading ? (
+            <ActivityIndicator size="large" color="#0000ff" />
+          ) : (
+            <ScrollView horizontal>
+              {prevision.map((item) => (
+                <View key={item.dt} style={styles.previsionDay}>
+                  <Text style={styles.previsionText}>{getJour(item.dt)}</Text>
+                  <Text style={styles.previsionText}>{item.main.temp}°C</Text>
+                  <Text style={styles.previsionText}>
+                    {item.weather[0].description}
+                  </Text>
+                  <Image
+                    source={{
+                      uri: `https://openweathermap.org/img/w/${item.weather[0].icon}.png`,
+                    }}
+                    style={styles.previsionIcon}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          <StatusBar style="auto" />
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    backgroundColor: "tan",
     alignItems: "center",
     justifyContent: "center",
+  },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 50,
+  },
+  accueil: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "beige",
+    borderColor: "grey",
+    borderRadius: 150,
     borderWidth: 2,
-    borderColor: "yellow",
-    borderRadius: 20,
+    width: 300,
+    height: 300,
+  },
+  backgroundImage: {
+    flex: 1,
+    resizeMode: "cover",
+    justifyContent: "center",
+    width: "100%",
+    height: "100%",
+    position: "absolute",
   },
   icon: {
     width: 100,
@@ -116,12 +184,26 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "black",
+    color: "brown",
     marginTop: 10,
+  },
+  gras: {
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  grasTemp: {
+    fontSize: 26,
+    fontWeight: "bold",
   },
   previsionDay: {
     alignItems: "center",
     marginHorizontal: 10,
+    backgroundColor: "beige",
+    width: 100,
+    height: 170,
+    borderColor: "grey",
+    borderRadius: 5,
+    borderWidth: 2,
   },
   previsionText: {
     fontSize: 16,
@@ -136,9 +218,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
-// function getDayOfWeek(timestamp) {
-//   const days = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
-//   const date = new Date(timestamp * 1000);
-//   return days[date.getDay()];
-// }
