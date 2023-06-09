@@ -37,14 +37,28 @@ export default function App() {
   //-------------------------METEO API-------------------------//
   const [meteo, setMeteo] = useState(null);
   const [prevision, setPrevision] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   const APIKey = "a8fcaa294aa3d1dcd5ae451cd20493ab";
+
+  const filtreTexte = (txt, requete) => {
+    //console.log(requete);
+    const newTxt = txt.toString();
+    //console.log(newTxt);
+    const texteMinuscule = newTxt.toLowerCase();
+    const requeteMinuscule = requete.toLowerCase();
+    //console.log(requeteMinuscule);
+  
+    if (texteMinuscule.includes(requeteMinuscule)) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+  
 
   useEffect(() => {
     if (latitude && longitude) {
       //Recupere meteo du jour
-      setIsLoading(true);
       try {
         fetch(
           `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=fr&appid=${APIKey}`
@@ -54,7 +68,6 @@ export default function App() {
             if (json.weather && json.main) {
               setMeteo(json);
             }
-            setIsLoading(false);
           });
         //Recupère méteo pour les 5 prochains jours
         fetch(
@@ -62,11 +75,26 @@ export default function App() {
         )
           .then((response) => response.json())
           .then((json) => {
-            setPrevision(json.list);
+            // console.log("coucou");
+            const filteredPrevisions = [];
+            for (let index = 0; index < json.list.length; index++) {
+              // console.log("coucou");
+              //console.log(time.dt);
+              let timestamp = json.list[index].dt;
+              let date = new Date(timestamp * 1000);
+              //console.log(date);
+              let result = filtreTexte(date, "14:00:00")
+               if (result == true) {
+                //console.log(date);
+                //   console.log(json.list[index]);
+                filteredPrevisions.push(json.list[index]);
+               }
+            }
+            setPrevision(filteredPrevisions);
+            // console.log(filtreTexte(fruits, "T15")); // ['banane', 'mangue'];
           });
       } catch (error) {
         console.error("Echec fetch :", error);
-        setIsLoading(false);
       }
     }
   }, [latitude, longitude]);
@@ -112,13 +140,11 @@ export default function App() {
           </View>
 
           <Text style={styles.text}>
-            Prévisions météo à 15h pour les 5 prochains jours
+            Prévisions météo à 14h pour les 5 prochains jours
           </Text>
 
           {errorMsg ? (
             <Text style={styles.paragraph}>{errorMsg}</Text>
-          ) : isLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
           ) : (
             <ScrollView horizontal>
               {prevision.map((item) => (
